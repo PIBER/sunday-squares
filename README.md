@@ -2,6 +2,8 @@
 
 A sleek, mobile-friendly, fully customizable, mobile-friendly Super Bowl Squares game built with PHP and SQLite.
 
+![sunday_squares_sm](https://github.com/user-attachments/assets/35b1a643-cf78-4d0d-b1c5-83f567acab2e)
+
 ## Features
 
 - **Beautiful dark theme** with gold accents
