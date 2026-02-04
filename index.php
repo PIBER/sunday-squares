@@ -1065,7 +1065,10 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
 
         function updateUI() {
             const count = selected.size;
-            selectedCount.textContent = count;
+            const total = count * pricePerSquare;
+            
+            // Updates button to show: "Complete Purchase (3) | $30"
+            purchaseBtn.innerHTML = `Complete Purchase (${count}) <span style="opacity:0.6; margin:0 8px">|</span> $${total}`;
             purchaseBtn.classList.toggle('visible', count > 0);
         }
 
