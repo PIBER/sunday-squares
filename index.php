@@ -20,10 +20,14 @@ $game_name = $meta['game_name'] ?? "Piber's Squares";
 $price_per_square = (int)($meta['price_per_square'] ?? 10);
 $venmo_handle = $meta['venmo_handle'] ?? '@pibervision';
 
-// Auto-calculate prizes: (100 squares * price) / 4 quarters
+// Auto-calculate prizes: Q1(12.5%), Half(25%), Q3(12.5%), Final(50%)
 $total_pot = 100 * $price_per_square;
-$prize_per_quarter = $total_pot / 4;
-$prizes = ['q1' => $prize_per_quarter, 'q2' => $prize_per_quarter, 'q3' => $prize_per_quarter, 'q4' => $prize_per_quarter];
+$prizes = [
+    'q1' => $total_pot * 0.125, 
+    'q2' => $total_pot * 0.25, 
+    'q3' => $total_pot * 0.125, 
+    'q4' => $total_pot * 0.50
+];
 
 // Count squares
 $open_count = 0;

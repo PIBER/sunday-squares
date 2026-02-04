@@ -247,9 +247,12 @@ $game_name = $meta['game_name'] ?? "Piber's Squares";
 $venmo_handle = $meta['venmo_handle'] ?? '@pibervision';
 $price_per_square = (int)($meta['price_per_square'] ?? 10);
 
-// Auto-calculate prizes: (100 squares * price) / 4 quarters
+// Auto-calculate prizes: Q1(12.5%), Half(25%), Q3(12.5%), Final(50%)
 $total_pot = 100 * $price_per_square;
-$prize_per_quarter = $total_pot / 4;
+$prize_q1 = $total_pot * 0.125;
+$prize_q2 = $total_pot * 0.25;
+$prize_q3 = $total_pot * 0.125;
+$prize_q4 = $total_pot * 0.50;
 
 // Stats
 $stats = $db->query("SELECT status, COUNT(*) as cnt FROM squares GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -856,19 +859,19 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">Q1</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q1) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">HALF</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q2) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">Q3</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q3) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">FINAL</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q4) ?></div>
                             </div>
                         </div>
                         <div style="text-align: center; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
