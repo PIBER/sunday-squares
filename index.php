@@ -844,7 +844,7 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
     <div class="container">
         <header class="header">
             <h1 class="logo"><?= htmlspecialchars($game_name) ?></h1>
-            <p class="subtitle">Super Bowl LIX</p>
+            <p class="subtitle">Sunday Funday</p>
         </header>
 
         <div class="stats-bar">
