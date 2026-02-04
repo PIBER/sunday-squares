@@ -1,4 +1,9 @@
 <?php
+// Load optional config
+if (file_exists(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+}
+
 // Use absolute path for database
 $db_path = __DIR__ . '/squares.db';
 try {
@@ -91,6 +96,17 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+    <?php if (!empty($google_analytics_id)): ?>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<?= $google_analytics_id ?>"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '<?= $google_analytics_id ?>');
+    </script>
+    <?php endif; ?>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?= htmlspecialchars($game_name) ?></title>
