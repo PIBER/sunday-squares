@@ -181,10 +181,6 @@ if (isset($_POST['update_settings'])) {
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('side_team', ?)")->execute([$_POST['side_team']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('price_per_square', ?)")->execute([$_POST['price_per_square']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('venmo_handle', ?)")->execute([$_POST['venmo_handle']]);
-    // Update password only if a new one is entered
-    if (!empty($_POST['new_admin_pass'])) {
-        $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('admin_pass', ?)")->execute([$_POST['new_admin_pass']]);
-    }
     header("Location: admin.php?msg=settings"); exit;
 }
 
@@ -844,10 +840,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <div class="settings-group">
                             <label>Venmo Handle</label>
                             <input type="text" name="venmo_handle" value="<?= htmlspecialchars($venmo_handle) ?>" class="settings-input" placeholder="@username" required>
-                        </div>
-                        <div class="settings-group">
-                            <label>Change Admin Password</label>
-                            <input type="text" name="new_admin_pass" class="settings-input" placeholder="Leave blank to keep current">
                         </div>
                     </div>
                     
