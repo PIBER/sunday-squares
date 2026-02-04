@@ -3,3 +3,5 @@ squares.db
 # macOS clutter
 ._*
 .DS_Store
+#no sync google analytics
+config.php
