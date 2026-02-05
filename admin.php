@@ -703,6 +703,36 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             opacity: 1;
         }
 
+        /* Sort options */
+        .sort-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sort-btn {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .sort-btn:hover {
+            border-color: var(--accent-gold);
+            color: var(--text-primary);
+        }
+
+        .sort-btn.active {
+            background: var(--accent-gold);
+            color: var(--bg-dark);
+            border-color: var(--accent-gold);
+        }
+
         /* Edit Modal */
         .modal-overlay {
             position: fixed;
@@ -850,10 +880,28 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
 
         <!-- Payments Section -->
         <div class="section">
-            <div class="section-header">
-                <span>💳</span> Player Payments
+            <div class="section-header" style="justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>💳</span> Player Payments
+                </div>
+                <div class="sort-options">
+                    <span style="font-size: 0.65rem; color: var(--text-muted); font-family: 'Inter', sans-serif; text-transform: none; letter-spacing: 0;">Sort:</span>
+                    <button type="button" class="sort-btn <?= (!isset($_GET['sort']) || $_GET['sort'] === 'name') ? 'active' : '' ?>" onclick="window.location='?sort=name'">Name</button>
+                    <button type="button" class="sort-btn <?= (isset($_GET['sort']) && $_GET['sort'] === 'squares') ? 'active' : '' ?>" onclick="window.location='?sort=squares'">Squares</button>
+                </div>
             </div>
             <div class="section-body">
+                <?php 
+                // Sort players based on selection
+                $sort = $_GET['sort'] ?? 'name';
+                if ($sort === 'squares') {
+                    usort($pending, fn($a, $b) => $b['count'] - $a['count']);
+                    usort($paid, fn($a, $b) => $b['count'] - $a['count']);
+                } else {
+                    usort($pending, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+                    usort($paid, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+                }
+                ?>
                 <?php if (empty($pending) && empty($paid)): ?>
                     <div class="empty-state">No players yet</div>
                 <?php else: ?>
