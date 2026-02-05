@@ -42,7 +42,6 @@ if (!isset($_SESSION['logged_in'])) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Commissioner Login</title>
-        <link rel="icon" href="nfl_facicon.ico" type="image/x-icon">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -181,10 +180,6 @@ if (isset($_POST['update_settings'])) {
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('side_team', ?)")->execute([$_POST['side_team']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('price_per_square', ?)")->execute([$_POST['price_per_square']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('venmo_handle', ?)")->execute([$_POST['venmo_handle']]);
-    // Update password only if a new one is entered
-    if (!empty($_POST['new_admin_pass'])) {
-        $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('admin_pass', ?)")->execute([$_POST['new_admin_pass']]);
-    }
     header("Location: admin.php?msg=settings"); exit;
 }
 
@@ -196,6 +191,17 @@ if (isset($_POST['approve_name'])) {
 if (isset($_POST['release_name'])) {
     $db->prepare("UPDATE squares SET name = NULL, status = 'open' WHERE name = ? AND status = 'pending'")->execute([$_POST['release_name']]);
     header("Location: admin.php?msg=released"); exit;
+}
+
+// Rename Player
+if (isset($_POST['rename_player'])) {
+    $old_name = $_POST['old_name'];
+    $new_name = trim($_POST['new_name']);
+    if (!empty($new_name) && $new_name !== $old_name) {
+        $db->prepare("UPDATE squares SET name = ? WHERE name = ?")->execute([$new_name, $old_name]);
+        header("Location: admin.php?msg=renamed"); exit;
+    }
+    header("Location: admin.php"); exit;
 }
 
 // Board Actions
@@ -247,12 +253,9 @@ $game_name = $meta['game_name'] ?? "Piber's Squares";
 $venmo_handle = $meta['venmo_handle'] ?? '@pibervision';
 $price_per_square = (int)($meta['price_per_square'] ?? 10);
 
-// Auto-calculate prizes: Q1(12.5%), Half(25%), Q3(12.5%), Final(50%)
+// Auto-calculate prizes: (100 squares * price) / 4 quarters
 $total_pot = 100 * $price_per_square;
-$prize_q1 = $total_pot * 0.125;
-$prize_q2 = $total_pot * 0.25;
-$prize_q3 = $total_pot * 0.125;
-$prize_q4 = $total_pot * 0.50;
+$prize_per_quarter = $total_pot / 4;
 
 // Stats
 $stats = $db->query("SELECT status, COUNT(*) as cnt FROM squares GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -265,6 +268,7 @@ $messages = [
     'settings' => ['type' => 'success', 'text' => 'Settings saved'],
     'paid' => ['type' => 'success', 'text' => 'Payment confirmed'],
     'released' => ['type' => 'info', 'text' => 'Squares released back to pool'],
+    'renamed' => ['type' => 'success', 'text' => 'Player renamed successfully'],
     'shuffled' => ['type' => 'success', 'text' => 'Numbers randomized'],
     'cleared' => ['type' => 'info', 'text' => 'Numbers cleared'],
     'reset' => ['type' => 'warning', 'text' => 'Board has been reset'],
@@ -279,7 +283,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commissioner Dashboard</title>
-    <link rel="icon" href="nfl_facicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -683,6 +686,95 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                 margin-right: 0;
             }
         }
+
+        /* Edit button */
+        .btn-edit {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            opacity: 0.5;
+            padding: 2px 6px;
+            vertical-align: middle;
+            transition: opacity 0.2s;
+        }
+
+        .btn-edit:hover {
+            opacity: 1;
+        }
+
+        /* Edit Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .modal h3 {
+            margin-bottom: 16px;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.25rem;
+        }
+
+        .modal input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-elevated);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: 16px;
+        }
+
+        .modal input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .modal-buttons .btn-save {
+            background: var(--accent-gold);
+            color: var(--bg-dark);
+        }
+
+        .modal-buttons .btn-cancel {
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
@@ -769,7 +861,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <?php foreach ($pending as $p): ?>
                         <div class="pending-card">
                             <div class="pending-info">
-                                <h3><?= htmlspecialchars($p['name']) ?></h3>
+                                <h3 class="player-name" data-name="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?> <button type="button" class="btn-edit" onclick="editPlayer('<?= htmlspecialchars(addslashes($p['name'])) ?>')">✏️</button></h3>
                                 <p><?= $p['count'] ?> square<?= $p['count'] > 1 ? 's' : '' ?> · <span style="color: var(--warning);">Awaiting Payment</span></p>
                             </div>
                             <span class="pending-amount">$<?= $p['count'] * $price_per_square ?></span>
@@ -789,7 +881,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <?php foreach ($paid as $p): ?>
                         <div class="pending-card" style="border-left-color: var(--success);">
                             <div class="pending-info">
-                                <h3><?= htmlspecialchars($p['name']) ?></h3>
+                                <h3 class="player-name" data-name="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?> <button type="button" class="btn-edit" onclick="editPlayer('<?= htmlspecialchars(addslashes($p['name'])) ?>')">✏️</button></h3>
                                 <p><?= $p['count'] ?> square<?= $p['count'] > 1 ? 's' : '' ?> · <span style="color: var(--success);">✓ Paid</span></p>
                             </div>
                             <span class="pending-amount" style="color: var(--success);">$<?= $p['count'] * $price_per_square ?></span>
@@ -848,10 +940,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                             <label>Venmo Handle</label>
                             <input type="text" name="venmo_handle" value="<?= htmlspecialchars($venmo_handle) ?>" class="settings-input" placeholder="@username" required>
                         </div>
-                        <div class="settings-group">
-                            <label>Change Admin Password</label>
-                            <input type="text" name="new_admin_pass" class="settings-input" placeholder="Leave blank to keep current">
-                        </div>
                     </div>
                     
                     <div style="background: var(--bg-elevated); border-radius: 8px; padding: 16px; margin-top: 16px;">
@@ -859,19 +947,19 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">Q1</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q1) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">HALF</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q2) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">Q3</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q3) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
                             </div>
                             <div>
                                 <div style="font-size: 0.65rem; color: var(--text-muted);">FINAL</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q4) ?></div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_per_quarter) ?></div>
                             </div>
                         </div>
                         <div style="text-align: center; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
@@ -884,5 +972,45 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             </div>
         </div>
     </div>
+
+    <!-- Edit Player Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>✏️ Edit Player Name</h3>
+            <form method="POST" id="renameForm">
+                <input type="hidden" name="rename_player" value="1">
+                <input type="hidden" name="old_name" id="oldNameInput">
+                <input type="text" name="new_name" id="newNameInput" placeholder="Enter new name" required>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function editPlayer(name) {
+            document.getElementById('oldNameInput').value = name;
+            document.getElementById('newNameInput').value = name;
+            document.getElementById('editModal').classList.add('active');
+            document.getElementById('newNameInput').focus();
+            document.getElementById('newNameInput').select();
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        // Close modal on background click
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditModal();
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeEditModal();
+        });
+    </script>
 </body>
 </html>
