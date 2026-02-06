@@ -1026,7 +1026,7 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
                 <div class="modal-squares" id="modalSquares">0 squares selected</div>
             </div>
             <div class="modal-payment">
-                <div class="modal-payment-label">Send Payment To</div>
+                <div class="modal-payment-label">Send Venmo Payment To</div>
                 <div class="modal-venmo"><?= htmlspecialchars($venmo_handle) ?></div>
                 <div class="modal-note">Use emojis only in the note! 🏈🍺</div>
             </div>
