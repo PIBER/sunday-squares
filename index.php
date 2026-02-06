@@ -1,4 +1,9 @@
 <?php
+// Load optional config
+if (file_exists(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+}
+
 // Use absolute path for database
 $db_path = __DIR__ . '/squares.db';
 try {
@@ -23,9 +28,9 @@ $venmo_handle = $meta['venmo_handle'] ?? '@pibervision';
 // Auto-calculate prizes: Q1(12.5%), Half(25%), Q3(12.5%), Final(50%)
 $total_pot = 100 * $price_per_square;
 $prizes = [
-    'q1' => $total_pot * 0.125,
-    'q2' => $total_pot * 0.25,
-    'q3' => $total_pot * 0.125,
+    'q1' => $total_pot * 0.125, 
+    'q2' => $total_pot * 0.25, 
+    'q3' => $total_pot * 0.125, 
     'q4' => $total_pot * 0.50
 ];
 
@@ -91,6 +96,17 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+    <?php if (!empty($google_analytics_id)): ?>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<?= $google_analytics_id ?>"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '<?= $google_analytics_id ?>');
+    </script>
+    <?php endif; ?>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?= htmlspecialchars($game_name) ?></title>
@@ -644,37 +660,16 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
             margin-bottom: 4px;
         }
 
-        .modal-venmo-link {
-            display: inline-block;
-            background: #008CFF;
-            color: white;
+        .modal-venmo {
             font-family: 'Bebas Neue', sans-serif;
-            font-size: 1.3rem;
-            letter-spacing: 0.05em;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .modal-venmo-link:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 20px rgba(0, 140, 255, 0.4);
-        }
-
-        .modal-venmo-link .venmo-logo {
-            background: white;
+            font-size: 1.5rem;
             color: #008CFF;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            margin-right: 8px;
         }
 
         .modal-note {
             font-size: 0.75rem;
             color: var(--text-muted);
-            margin-top: 12px;
+            margin-top: 8px;
         }
 
         .modal-input {
@@ -869,7 +864,7 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
     <div class="container">
         <header class="header">
             <h1 class="logo"><?= htmlspecialchars($game_name) ?></h1>
-            <p class="subtitle">Super Bowl LIX</p>
+            <p class="subtitle">Sunday Funday</p>
         </header>
 
         <div class="stats-bar">
@@ -997,9 +992,6 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
                     <p style="margin-top: 12px; color: var(--text-muted);">
                         <strong>Example:</strong> If <?= htmlspecialchars($meta['top_team']) ?> has 17 and <?= htmlspecialchars($meta['side_team']) ?> has 14, we find where column <strong>7</strong> meets row <strong>4</strong> — that person wins the quarter prize!
                     </p>
-                    <p style="margin-top: 12px; color: var(--text-muted);">
-                        <strong>Note:</strong> The Final prize is based on the final score of the game, including overtime if played.
-                    </p>
                 </div>
             </div>
         </div>
@@ -1034,11 +1026,9 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
                 <div class="modal-squares" id="modalSquares">0 squares selected</div>
             </div>
             <div class="modal-payment">
-                <div class="modal-payment-label">Send Payment To</div>
-                <a href="#" id="venmoLink" class="modal-venmo-link" target="_blank">
-                    <span class="venmo-logo">Venmo</span> <?= htmlspecialchars(ltrim($venmo_handle, '@')) ?>
-                </a>
-                <div class="modal-note">Tap above to pay — note is pre-filled! 🏈🍺</div>
+                <div class="modal-payment-label">Send Venmo Payment To</div>
+                <div class="modal-venmo"><?= htmlspecialchars($venmo_handle) ?></div>
+                <div class="modal-note">Use emojis only in the note! 🏈🍺</div>
             </div>
             <form method="POST" id="purchaseForm">
                 <input type="hidden" name="squares" id="squaresInput">
@@ -1050,15 +1040,13 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
     </div>
 
     <script>
-        const selected = new Map();
+        const selected = new Map(); // Changed to Map to track order
         const purchaseBtn = document.getElementById('purchaseBtn');
         const modal = document.getElementById('modal');
         const selectedCount = document.getElementById('selectedCount');
         const modalTotal = document.getElementById('modalTotal');
         const modalSquares = document.getElementById('modalSquares');
         const squaresInput = document.getElementById('squaresInput');
-        const venmoLink = document.getElementById('venmoLink');
-        const venmoHandle = '<?= htmlspecialchars(ltrim($venmo_handle, '@')) ?>';
         const pricePerSquare = <?= $price_per_square ?>;
         let selectionOrder = 0;
 
@@ -1097,7 +1085,10 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
 
         function updateUI() {
             const count = selected.size;
-            selectedCount.textContent = count;
+            const total = count * pricePerSquare;
+            
+            // Updates button to show: "Complete Purchase (3) | $30"
+            purchaseBtn.innerHTML = `Complete Purchase (${count}) <span style="opacity:0.6; margin:0 8px">|</span> $${total}`;
             purchaseBtn.classList.toggle('visible', count > 0);
         }
 
@@ -1107,11 +1098,6 @@ $period_labels = ['q1' => 'Q1', 'q2' => 'Half', 'q3' => 'Q3', 'q4' => 'Final'];
             modalTotal.textContent = '$' + total;
             modalSquares.textContent = count + ' square' + (count !== 1 ? 's' : '') + ' selected';
             squaresInput.value = Array.from(selected.keys()).join(',');
-            
-            // Build Venmo deep link with pre-filled amount and emoji-only note
-            const venmoNote = encodeURIComponent('🏈🍺');
-            venmoLink.href = `https://venmo.com/${venmoHandle}?txn=pay&amount=${total}&note=${venmoNote}`;
-            
             modal.classList.add('active');
         });
 
