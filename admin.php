@@ -1,6 +1,10 @@
 <?php
 session_start();
 
+if (file_exists(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+}
+
 // Use absolute path for database
 $db_path = __DIR__ . '/squares.db';
 try {
@@ -42,7 +46,17 @@ if (!isset($_SESSION['logged_in'])) {
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
+	<?php if (!empty($google_analytics_id)): ?>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=<?= $google_analytics_id ?>"></script>
+	<script>
+  	window.dataLayer = window.dataLayer || [];
+  	function gtag(){dataLayer.push(arguments);}
+  	gtag('js', new Date());
+  	gtag('config', '<?= $google_analytics_id ?>');
+	</script>
+<?php endif; ?>
+
+<meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Commissioner Login</title>
         <link rel="icon" href="nfl_facicon.ico" type="image/x-icon">
