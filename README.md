@@ -43,6 +43,7 @@ The application uses a local SQLite database (`squares.db`). The web server must
 Give ownership to the web server user (usually `www-data` or `apache`):
 
 sudo chown -R www-data:www-data /var/www/html/squares
+
 sudo chmod -R 775 /var/www/html/squares
 
 3. Visit `yoursite.com/admin.php` to configure your game
