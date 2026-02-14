@@ -1,6 +1,4 @@
 #no sync db
-# macOS clutter
-._*
-.DS_Store
+squares.db
 #no sync google analytics
 config.php
