@@ -1,0 +1,14 @@
+<?php
+/**
+ * Global Configuration Template
+ * * Instructions:
+ * 1. Copy this file to 'config.php'
+ * 2. Fill in your actual values below
+ * 3. 'config.php' is ignored by git to keep your keys private
+ */
+
+// Google Analytics Measurement ID (e.g., G-XXXXXXXXXX)
+$google_analytics_id = ''; 
+
+// Add any other environment-specific settings here
+// $debug_mode = false;
