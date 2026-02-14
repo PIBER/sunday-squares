@@ -36,6 +36,15 @@ A sleek, mobile-friendly, fully customizable, mobile-friendly Super Bowl Squares
 
 2. Make sure the directory is writable (for the SQLite database)
 
+## Permissions
+The application uses a local SQLite database (`squares.db`). The web server must have **write permissions** for the project directory so it can create temporary lock files.
+
+**Recommended setup:**
+Give ownership to the web server user (usually `www-data` or `apache`):
+
+sudo chown -R www-data:www-data /var/www/html/squares
+sudo chmod -R 775 /var/www/html/squares
+
 3. Visit `yoursite.com/admin.php` to configure your game
    - Default password: `changeme` (change this in the database!)
 
