@@ -20,6 +20,9 @@ if (isset($_POST['login_pass'])) {
     $stmt = $db->prepare("SELECT value FROM metadata WHERE key = 'admin_pass'");
     $stmt->execute();
     $real_pass = $stmt->fetchColumn();
+    // Default to 'arnold' if no password is set in DB yet
+    if (!$real_pass) $real_pass = 'arnold';
+    
     if ($_POST['login_pass'] === $real_pass) {
         $_SESSION['logged_in'] = true;
     } else {
@@ -42,6 +45,7 @@ if (!isset($_SESSION['logged_in'])) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Commissioner Login</title>
+        <link rel="icon" href="nfl_facicon.ico" type="image/x-icon">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -180,7 +184,29 @@ if (isset($_POST['update_settings'])) {
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('side_team', ?)")->execute([$_POST['side_team']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('price_per_square', ?)")->execute([$_POST['price_per_square']]);
     $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('venmo_handle', ?)")->execute([$_POST['venmo_handle']]);
+    
+    // --- PASSWORD UPDATE LOGIC ---
+    if (!empty($_POST['new_admin_pass'])) {
+        $db->prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('admin_pass', ?)")->execute([$_POST['new_admin_pass']]);
+    }
+    // -----------------------------
+
     header("Location: admin.php?msg=settings"); exit;
+}
+
+// Rename Player Logic
+if (isset($_POST['rename_player'])) {
+    $old_name = $_POST['old_name'];
+    $new_name = $_POST['new_name'];
+    if (!empty($old_name) && !empty($new_name)) {
+        // Update all instances of the old name in the squares table
+        $stmt = $db->prepare("UPDATE squares SET name = ? WHERE name = ?");
+        $stmt->execute([$new_name, $old_name]);
+        header("Location: admin.php?msg=renamed"); 
+    } else {
+        header("Location: admin.php?msg=error");
+    }
+    exit;
 }
 
 // Payment Actions
@@ -191,17 +217,6 @@ if (isset($_POST['approve_name'])) {
 if (isset($_POST['release_name'])) {
     $db->prepare("UPDATE squares SET name = NULL, status = 'open' WHERE name = ? AND status = 'pending'")->execute([$_POST['release_name']]);
     header("Location: admin.php?msg=released"); exit;
-}
-
-// Rename Player
-if (isset($_POST['rename_player'])) {
-    $old_name = $_POST['old_name'];
-    $new_name = trim($_POST['new_name']);
-    if (!empty($new_name) && $new_name !== $old_name) {
-        $db->prepare("UPDATE squares SET name = ? WHERE name = ?")->execute([$new_name, $old_name]);
-        header("Location: admin.php?msg=renamed"); exit;
-    }
-    header("Location: admin.php"); exit;
 }
 
 // Board Actions
@@ -255,12 +270,10 @@ $price_per_square = (int)($meta['price_per_square'] ?? 10);
 
 // Auto-calculate prizes: Q1(12.5%), Half(25%), Q3(12.5%), Final(50%)
 $total_pot = 100 * $price_per_square;
-$prizes = [
-    'q1' => $total_pot * 0.125,
-    'q2' => $total_pot * 0.25,
-    'q3' => $total_pot * 0.125,
-    'q4' => $total_pot * 0.50
-];
+$prize_q1 = $total_pot * 0.125;
+$prize_q2 = $total_pot * 0.25;
+$prize_q3 = $total_pot * 0.125;
+$prize_q4 = $total_pot * 0.50;
 
 // Stats
 $stats = $db->query("SELECT status, COUNT(*) as cnt FROM squares GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -273,10 +286,11 @@ $messages = [
     'settings' => ['type' => 'success', 'text' => 'Settings saved'],
     'paid' => ['type' => 'success', 'text' => 'Payment confirmed'],
     'released' => ['type' => 'info', 'text' => 'Squares released back to pool'],
-    'renamed' => ['type' => 'success', 'text' => 'Player renamed successfully'],
     'shuffled' => ['type' => 'success', 'text' => 'Numbers randomized'],
     'cleared' => ['type' => 'info', 'text' => 'Numbers cleared'],
     'reset' => ['type' => 'warning', 'text' => 'Board has been reset'],
+    'renamed' => ['type' => 'success', 'text' => 'Player renamed successfully'],
+    'error' => ['type' => 'error', 'text' => 'An error occurred'],
 ];
 $msg = isset($_GET['msg']) && isset($messages[$_GET['msg']]) ? $messages[$_GET['msg']] : null;
 
@@ -288,6 +302,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commissioner Dashboard</title>
+    <link rel="icon" href="nfl_facicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -388,6 +403,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
         .alert.success { background: var(--success-dim); border: 1px solid var(--success); color: var(--success); }
         .alert.warning { background: var(--warning-dim); border: 1px solid var(--warning); color: var(--warning); }
         .alert.info { background: var(--info-dim); border: 1px solid var(--info); color: var(--info); }
+        .alert.error { background: var(--error-dim); border: 1px solid var(--error); color: var(--error); }
 
         .stats-grid {
             display: grid;
@@ -536,7 +552,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             gap: 8px;
         }
 
-        .btn-approve, .btn-release {
+        .btn-approve, .btn-release, .btn-rename {
             padding: 8px 14px;
             border: none;
             border-radius: 6px;
@@ -556,8 +572,14 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             color: var(--text-muted);
             border: 1px solid rgba(255,255,255,0.1);
         }
+        
+        .btn-rename {
+            background: var(--info);
+            color: white;
+            margin-left: 8px;
+        }
 
-        .btn-approve:hover, .btn-release:hover {
+        .btn-approve:hover, .btn-release:hover, .btn-rename:hover {
             transform: scale(1.05);
         }
 
@@ -656,6 +678,50 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             margin-top: 0;
         }
 
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--bg-card);
+            padding: 24px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .btn-cancel {
+            flex: 1;
+            padding: 10px;
+            background: var(--bg-elevated);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-save {
+            flex: 1;
+            padding: 10px;
+            background: var(--success);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
         @media (max-width: 500px) {
             .header {
                 flex-direction: column;
@@ -691,125 +757,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                 margin-right: 0;
             }
         }
-
-        /* Edit button */
-        .btn-edit {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.75rem;
-            opacity: 0.5;
-            padding: 2px 6px;
-            vertical-align: middle;
-            transition: opacity 0.2s;
-        }
-
-        .btn-edit:hover {
-            opacity: 1;
-        }
-
-        /* Sort options */
-        .sort-options {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .sort-btn {
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text-muted);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .sort-btn:hover {
-            border-color: var(--accent-gold);
-            color: var(--text-primary);
-        }
-
-        .sort-btn.active {
-            background: var(--accent-gold);
-            color: var(--bg-dark);
-            border-color: var(--accent-gold);
-        }
-
-        /* Edit Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 24px;
-            width: 90%;
-            max-width: 400px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .modal h3 {
-            margin-bottom: 16px;
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 1.25rem;
-        }
-
-        .modal input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            background: var(--bg-elevated);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            margin-bottom: 16px;
-        }
-
-        .modal input[type="text"]:focus {
-            outline: none;
-            border-color: var(--accent-gold);
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-        }
-
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .modal-buttons .btn-save {
-            background: var(--accent-gold);
-            color: var(--bg-dark);
-        }
-
-        .modal-buttons .btn-cancel {
-            background: var(--bg-elevated);
-            color: var(--text-secondary);
-        }
     </style>
 </head>
 <body>
@@ -837,6 +784,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                 <?php if ($msg['type'] === 'success'): ?>✓<?php endif; ?>
                 <?php if ($msg['type'] === 'warning'): ?>⚠<?php endif; ?>
                 <?php if ($msg['type'] === 'info'): ?>ℹ<?php endif; ?>
+                <?php if ($msg['type'] === 'error'): ?>✕<?php endif; ?>
                 <?= $msg['text'] ?>
             </div>
         <?php endif; ?>
@@ -856,7 +804,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             </div>
         </div>
 
-        <!-- Scores Section -->
         <div class="section">
             <div class="section-header">
                 <span>🏈</span> Update Scores
@@ -883,30 +830,11 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             </div>
         </div>
 
-        <!-- Payments Section -->
         <div class="section">
-            <div class="section-header" style="justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span>💳</span> Player Payments
-                </div>
-                <div class="sort-options">
-                    <span style="font-size: 0.65rem; color: var(--text-muted); font-family: 'Inter', sans-serif; text-transform: none; letter-spacing: 0;">Sort:</span>
-                    <button type="button" class="sort-btn <?= (!isset($_GET['sort']) || $_GET['sort'] === 'name') ? 'active' : '' ?>" onclick="window.location='?sort=name'">Name</button>
-                    <button type="button" class="sort-btn <?= (isset($_GET['sort']) && $_GET['sort'] === 'squares') ? 'active' : '' ?>" onclick="window.location='?sort=squares'">Squares</button>
-                </div>
+            <div class="section-header">
+                <span>💳</span> Player Payments
             </div>
             <div class="section-body">
-                <?php 
-                // Sort players based on selection
-                $sort = $_GET['sort'] ?? 'name';
-                if ($sort === 'squares') {
-                    usort($pending, fn($a, $b) => $b['count'] - $a['count']);
-                    usort($paid, fn($a, $b) => $b['count'] - $a['count']);
-                } else {
-                    usort($pending, fn($a, $b) => strcasecmp($a['name'], $b['name']));
-                    usort($paid, fn($a, $b) => strcasecmp($a['name'], $b['name']));
-                }
-                ?>
                 <?php if (empty($pending) && empty($paid)): ?>
                     <div class="empty-state">No players yet</div>
                 <?php else: ?>
@@ -914,7 +842,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <?php foreach ($pending as $p): ?>
                         <div class="pending-card">
                             <div class="pending-info">
-                                <h3 class="player-name" data-name="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?> <button type="button" class="btn-edit" onclick="editPlayer('<?= htmlspecialchars(addslashes($p['name'])) ?>')">✏️</button></h3>
+                                <h3><?= htmlspecialchars($p['name']) ?></h3>
                                 <p><?= $p['count'] ?> square<?= $p['count'] > 1 ? 's' : '' ?> · <span style="color: var(--warning);">Awaiting Payment</span></p>
                             </div>
                             <span class="pending-amount">$<?= $p['count'] * $price_per_square ?></span>
@@ -927,6 +855,7 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                                     <input type="hidden" name="release_name" value="<?= htmlspecialchars($p['name']) ?>">
                                     <button type="submit" class="btn-release">Release</button>
                                 </form>
+                                <button type="button" class="btn-rename" onclick="editPlayer('<?= htmlspecialchars($p['name']) ?>')">✎</button>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -934,10 +863,13 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                         <?php foreach ($paid as $p): ?>
                         <div class="pending-card" style="border-left-color: var(--success);">
                             <div class="pending-info">
-                                <h3 class="player-name" data-name="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?> <button type="button" class="btn-edit" onclick="editPlayer('<?= htmlspecialchars(addslashes($p['name'])) ?>')">✏️</button></h3>
+                                <h3><?= htmlspecialchars($p['name']) ?></h3>
                                 <p><?= $p['count'] ?> square<?= $p['count'] > 1 ? 's' : '' ?> · <span style="color: var(--success);">✓ Paid</span></p>
                             </div>
-                            <span class="pending-amount" style="color: var(--success);">$<?= $p['count'] * $price_per_square ?></span>
+                            <div style="display:flex; align-items:center;">
+                                <span class="pending-amount" style="color: var(--success);">$<?= $p['count'] * $price_per_square ?></span>
+                                <button type="button" class="btn-rename" onclick="editPlayer('<?= htmlspecialchars($p['name']) ?>')">✎</button>
+                            </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -945,7 +877,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             </div>
         </div>
 
-        <!-- Board Management -->
         <div class="section">
             <div class="section-header">
                 <span>🎲</span> Board Management
@@ -965,7 +896,6 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
             </div>
         </div>
 
-        <!-- Settings -->
         <div class="section">
             <div class="section-header">
                 <span>⚙️</span> Game Settings
@@ -993,26 +923,30 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
                             <label>Venmo Handle</label>
                             <input type="text" name="venmo_handle" value="<?= htmlspecialchars($venmo_handle) ?>" class="settings-input" placeholder="@username" required>
                         </div>
+                        <div class="settings-group">
+                            <label>Change Admin Password</label>
+                            <input type="text" name="new_admin_pass" class="settings-input" placeholder="Leave blank to keep current">
+                        </div>
                     </div>
                     
                     <div style="background: var(--bg-elevated); border-radius: 8px; padding: 16px; margin-top: 16px;">
                         <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px;">Auto-Calculated Prizes</div>
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--text-muted);">Q1 (12.5%)</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prizes['q1']) ?></div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted);">Q1</div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q1) ?></div>
                             </div>
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--text-muted);">HALF (25%)</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prizes['q2']) ?></div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted);">HALF</div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q2) ?></div>
                             </div>
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--text-muted);">Q3 (12.5%)</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prizes['q3']) ?></div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted);">Q3</div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q3) ?></div>
                             </div>
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--text-muted);">FINAL (50%)</div>
-                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prizes['q4']) ?></div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted);">FINAL</div>
+                                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; color: var(--accent-gold);">$<?= number_format($prize_q4) ?></div>
                             </div>
                         </div>
                         <div style="text-align: center; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
@@ -1026,14 +960,14 @@ $period_labels = ['q1' => '1st Quarter', 'q2' => 'Halftime', 'q3' => '3rd Quarte
         </div>
     </div>
 
-    <!-- Edit Player Modal -->
     <div class="modal-overlay" id="editModal">
-        <div class="modal">
-            <h3>✏️ Edit Player Name</h3>
+        <div class="modal-content">
+            <h3 style="font-family:'Bebas Neue',sans-serif; letter-spacing:0.05em; font-size:1.5rem; margin-bottom:16px;">Rename Player</h3>
+            <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:20px;">This will update the player's name across all their owned squares.</p>
             <form method="POST" id="renameForm">
                 <input type="hidden" name="rename_player" value="1">
                 <input type="hidden" name="old_name" id="oldNameInput">
-                <input type="text" name="new_name" id="newNameInput" placeholder="Enter new name" required>
+                <input type="text" name="new_name" id="newNameInput" class="settings-input" style="width:100%; margin-bottom:0;" placeholder="Enter new name" required>
                 <div class="modal-buttons">
                     <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
                     <button type="submit" class="btn-save">Save</button>

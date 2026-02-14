@@ -37,7 +37,7 @@ A sleek, mobile-friendly, fully customizable, mobile-friendly Super Bowl Squares
 2. Make sure the directory is writable (for the SQLite database)
 
 3. Visit `yoursite.com/admin.php` to configure your game
-   - Default password: `arnold` (change this in the database!)
+   - Default password: `changeme` (change this in the database!)
 
 ## Configuration
 
