@@ -1,4 +1,4 @@
-# 🏈 Sunday-Squares
+# 🏈 Sunday-Squares  [![Live Demo](https://img.shields.io/badge/demo-online-brightgreen)](https://squares.jnet.us/)
 
 A sleek, mobile-friendly, fully customizable, mobile-friendly Super Bowl Squares game built with PHP and SQLite.
 
